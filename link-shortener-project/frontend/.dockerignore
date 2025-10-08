@@ -1,0 +1,12 @@
+# Ignore dependencies,  asthey are installed inside the container
+node_modules
+
+# Ignore the production build folder, as it's created inside the container
+build
+
+# Ignore git files
+.git
+.gitignore
+
+# Ignore local environment files
+.env

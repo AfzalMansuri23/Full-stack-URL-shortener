@@ -1,0 +1,7 @@
+# Python dependencies for the link-service
+Flask
+Flask-Cors
+Flask-SQLAlchemy
+gunicorn
+shortuuid
+prometheus-flask-exporter

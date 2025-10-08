@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub-credentials')
+        KUBECONFIG = credentials('kubeconfig-file')
+    }
+
+    stages {
+        stage('Build Backend') {
+            steps {
+                echo 'Building the backend Docker image...'
+                dir('backend/link-service') {
+                    script {
+                        def backendImage = docker.build("nexusafzal/link-shortener-service:${env.BUILD_NUMBER}")
+                    }
+                }
+            }
+        }
+
+        stage('Build Frontend') {
+            steps {
+                echo 'Building the frontend Docker image...'
+                dir('frontend') {
+                    script {
+                        def frontendImage = docker.build("nexusafzal/link-shortener-frontend:${env.BUILD_NUMBER}")
+                    }
+                }
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Pushing images to Docker Hub...'
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', DOCKER_HUB_CREDENTIALS) {
+                        docker.image("nexusafzal/link-shortener-service:${env.BUILD_NUMBER}").push()
+                        docker.image("nexusafzal/link-shortener-frontend:${env.BUILD_NUMBER}").push()
+                    }
+                }
+            }
+        }
+
+        stage('Update Kubernetes Manifests') {
+            steps {
+                echo 'Updating image tags in Kubernetes manifests...'
+                script {
+                    // This command finds and replaces the image tag in your deployment files
+                    // It uses the unique build number for versioning instead of 'latest'
+                    sh "sed -i 's|image: nexusafzal/link-shortener-service:latest|image: nexusafzal/link-shortener-service:${env.BUILD_NUMBER}|g' kubernetes/backend-deployment.yaml"
+                    sh "sed -i 's|image: nexusafzal/link-shortener-frontend:latest|image: nexusafzal/link-shortener-frontend:${env.BUILD_NUMBER}|g' kubernetes/frontend-deployment.yaml"
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo 'Applying configurations to Kubernetes cluster...'
+                dir('kubernetes') {
+                    sh 'kubectl apply -f .'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished.'
+            cleanWs()
+        }
+    }
+}
